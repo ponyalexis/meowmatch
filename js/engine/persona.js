@@ -118,7 +118,6 @@ export function stylizeUserLine(text, persona, rng){
   const base = PERSONAS[persona.key];
   if(!base) return text;
   let out = text;
-  if(!/\*/.test(out) && rng.float() < 0.5) out = `${base.action} ${out}`;
   if(rng.float() < 0.4){ const w = base.words[Math.floor(rng.float()*base.words.length)]; out = out.replace(/\s*$/, "") + ` — ${w}.`; }
   if(rng.float() < 0.5 && !out.includes(base.emoji)) out = out + " " + base.emoji;
   return out;
