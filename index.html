@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#FF7A6B" />
+  <meta name="description" content="MeowMatch — l'app de rencontre pour chats parisiens. Swipe, matche, et lis les conversations de vos chats générées par IA." />
+  <title>MeowMatch 🐾 — Rencontres félines</title>
+
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./assets/icon.svg" />
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell"></div>
+
+  <!-- Bottom navigation (rendered by app.js, kept in DOM for stability) -->
+  <nav id="tabbar" class="tabbar" hidden>
+    <button class="tab" data-route="discover" aria-label="Découvrir">
+      <span class="tab-ico">🔥</span><span class="tab-lbl">Découvrir</span>
+    </button>
+    <button class="tab" data-route="matches" aria-label="Matchs">
+      <span class="tab-ico">💬</span><span class="tab-lbl">Matchs</span>
+      <span class="tab-badge" id="matchBadge" hidden>0</span>
+    </button>
+    <button class="tab" data-route="profile" aria-label="Mon chat">
+      <span class="tab-ico">🐱</span><span class="tab-lbl">Mon chat</span>
+    </button>
+  </nav>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
