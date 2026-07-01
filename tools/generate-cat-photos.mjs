@@ -44,9 +44,10 @@ const STRENGTH = parseFloat(opt("--strength", "0.55"));   // 0=copie la réf, 1=
 const CONCURRENCY = parseInt(opt("--concurrency", "3"), 10);
 
 const CFG = {
+  provider: process.env.IMG_PROVIDER || "gemini",   // "gemini" (Nano Banana), "openai", "generic"
   url: process.env.IMG_API_URL || "",
-  key: process.env.IMG_API_KEY || "",
-  model: process.env.IMG_MODEL || "flux-1.1-pro",   // ex: "flux-1.1-pro", "imagen-3", "gpt-image-1", "sd3.5-large"
+  key: process.env.IMG_API_KEY || process.env.GEMINI_API_KEY || "",
+  model: process.env.IMG_MODEL || "gemini-2.5-flash-image",  // Nano Banana par défaut
 };
 
 // Couleur FR -> anglais (les modèles rendent mieux en anglais)
@@ -68,29 +69,61 @@ function buildPrompt(cat, scene){
 }
 const NEGATIVE = "deformed, extra limbs, extra tails, two cats, human faces, watermark, text, logo, cartoon, illustration, blurry, low quality";
 
-/* ---- Adapte CETTE fonction à ton fournisseur d'images ----
-   Doit renvoyer un Buffer JPEG. Exemple de forme générique ci-dessous. */
-async function callImageModel({ model, prompt, negativePrompt, initImageB64, strength }){
+/* ---- Dispatch provider ---- */
+async function callImageModel(a){
+  if(CFG.provider === "gemini") return callGemini(a);
+  if(CFG.provider === "openai") return callOpenAI(a);
+  return callGeneric(a);
+}
+
+/* Nano Banana — Google Gemini 2.5 Flash Image (image + réf -> image éditée).
+   Le mieux pour garder LE MÊME chat d'une scène à l'autre. */
+async function callGemini({ model, prompt, initImageB64 }){
+  if(!CFG.key) throw new Error("GEMINI_API_KEY manquant");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${CFG.key}`;
+  const parts = [{ text: prompt }];
+  if(initImageB64) parts.push({ inline_data: { mime_type: "image/jpeg", data: initImageB64 } });
+  const res = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts }] })
+  });
+  if(!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0,200)}`);
+  const data = await res.json();
+  const out = data?.candidates?.[0]?.content?.parts?.find(p => p.inline_data || p.inlineData);
+  const b64 = out?.inline_data?.data || out?.inlineData?.data;
+  if(!b64) throw new Error("Gemini : pas d'image dans la réponse");
+  return Buffer.from(b64, "base64");
+}
+
+/* OpenAI gpt-image-1 (édition à partir d'une image de référence). */
+async function callOpenAI({ model, prompt, initImageB64 }){
+  if(!CFG.key) throw new Error("IMG_API_KEY (OpenAI) manquant");
+  const res = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CFG.key}` },
+    body: JSON.stringify({ model: model.startsWith("gpt-image")?model:"gpt-image-1", prompt, size: "1024x1024" })
+  });
+  if(!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0,200)}`);
+  const data = await res.json();
+  const b64 = data?.data?.[0]?.b64_json;
+  if(!b64) throw new Error("OpenAI : pas d'image dans la réponse");
+  return Buffer.from(b64, "base64");
+}
+
+/* Générique : adapte à ton provider (fal, Replicate, proxy maison…). */
+async function callGeneric({ model, prompt, negativePrompt, initImageB64, strength }){
   if(!CFG.url) throw new Error("IMG_API_URL non défini");
   const res = await fetch(CFG.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CFG.key}` },
-    body: JSON.stringify({
-      model,
-      prompt,
-      negative_prompt: negativePrompt,
-      image: initImageB64,           // image de référence (base64) pour l'img2img
-      image_strength: strength,      // conditionnement identité
-      width: 720, height: 900, output_format: "jpeg"
-    })
+    body: JSON.stringify({ model, prompt, negative_prompt: negativePrompt, image: initImageB64, image_strength: strength, width: 720, height: 900, output_format: "jpeg" })
   });
   if(!res.ok) throw new Error(`API ${res.status}: ${(await res.text()).slice(0,200)}`);
   const data = await res.json();
-  // Adapte selon ta réponse : { image_b64 } ou { url } ...
   if(data.image_b64) return Buffer.from(data.image_b64, "base64");
   if(data.url){ const img = await fetch(data.url); return Buffer.from(await img.arrayBuffer()); }
   if(Array.isArray(data.images) && data.images[0]?.b64_json) return Buffer.from(data.images[0].b64_json, "base64");
-  throw new Error("Réponse provider non reconnue — adapte callImageModel()");
+  throw new Error("Réponse provider non reconnue — adapte callGeneric()");
 }
 
 async function fetchReference(imageId){
@@ -131,8 +164,13 @@ export const GENERATED = ${JSON.stringify(manifest, null, 0)};
 async function main(){
   let cats = generateSeed(100);
   if(LIMIT) cats = cats.slice(0, LIMIT);
-  console.log(`${DRY ? "DRY-RUN" : "Génération"} · ${cats.length} chats × 5 photos · modèle ${CFG.model} · strength ${STRENGTH}`);
-  if(!DRY && !CFG.url){ console.error("\n❌ IMG_API_URL / IMG_API_KEY manquants. Utilise --dry-run pour voir les prompts, ou configure ton provider."); process.exit(1); }
+  console.log(`${DRY ? "DRY-RUN" : "Génération"} · ${cats.length} chats × 5 photos · provider ${CFG.provider} · modèle ${CFG.model}`);
+  const needsKey = (CFG.provider === "gemini" || CFG.provider === "openai") && !CFG.key;
+  const needsUrl = CFG.provider === "generic" && !CFG.url;
+  if(!DRY && (needsKey || needsUrl)){
+    console.error("\n❌ Config manquante. Ex : GEMINI_API_KEY=… node tools/generate-cat-photos.mjs   (ou --dry-run pour voir les prompts).");
+    process.exit(1);
+  }
 
   const manifest = {};
   // pool de concurrence simple

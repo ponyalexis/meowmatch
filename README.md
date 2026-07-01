@@ -45,16 +45,21 @@ la photo de référence :
 # aperçu des prompts (sans clé) :
 node tools/generate-cat-photos.mjs --dry-run --limit 3
 
-# génération réelle (Node >= 18) — provider pluggable :
-IMG_API_URL="https://ton-provider/v1/images" IMG_API_KEY="sk-…" IMG_MODEL="flux-1.1-pro" \
-  node tools/generate-cat-photos.mjs
+# génération réelle (Node >= 18). Provider par défaut : Nano Banana (Gemini 2.5 Flash Image),
+# le meilleur pour garder LE MÊME chat d'une scène à l'autre :
+GEMINI_API_KEY="…" node tools/generate-cat-photos.mjs --limit 10   # commence par 10 chats
+
+# autres providers :
+IMG_PROVIDER=openai  IMG_API_KEY="sk-…" node tools/generate-cat-photos.mjs
+IMG_PROVIDER=generic IMG_API_URL="https://fal/…" IMG_API_KEY="…" node tools/generate-cat-photos.mjs
 ```
 
 Le script source la photo cataas, construit un prompt « scène d'archétype » (ex. *diva → trônant
-sur un fauteuil de velours*), appelle le modèle en le conditionnant sur la référence (même robe,
-même morphologie), sauve dans `assets/cats/<id>/` et écrit `js/data/generated-photos.js` — que
-l'app lit automatiquement (sinon fallback cataas). Adapte `callImageModel()` à ton fournisseur
-(FLUX, Imagen, gpt-image, SD3.5…). ⚠️ Nécessite une clé d'API d'un modèle d'images.
+sur un fauteuil de velours*), appelle le modèle en le **conditionnant sur la photo de référence**
+(même robe, même morphologie), sauve dans `assets/cats/<id>/` et écrit `js/data/generated-photos.js`
+— que l'app lit automatiquement (sinon fallback cataas). Presets fournis : **Gemini/Nano Banana**
+(défaut), **OpenAI gpt-image**, **generic** (fal, Replicate, proxy). ⚠️ Nécessite une clé d'API.
+100 chats × 5 = 500 images : commence par `--limit 10` pour valider la qualité et le coût.
 
 ## 💘 Compatibilité & 🧠 personnalité
 
