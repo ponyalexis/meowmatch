@@ -53,6 +53,19 @@ const SOULMATE_LINES = [
   "Je crois que c'est ça, l'amour de chat. *ferme les yeux, comblé·e* 😻"
 ];
 
+/* Petit rappel qui RÉAGIT à ton dernier geste (beat) -> le chat a l'air d'écouter,
+   au lieu d'enchaîner une question générique. Placé ~1 fois sur 2. */
+const CALLBACK = {
+  charm:   ["*fait le gros dos, ravi·e*", "*ronronne un peu plus fort*"],
+  play:    ["*bondit, tout excité·e*", "*fait mine de chasser ta queue*"],
+  tease:   ["*rit sous ses moustaches*", "*te lance un regard en coin*"],
+  food:    ["*se lèche déjà les babines*", "*l'estomac gargouille en écho*"],
+  brag:    ["*lève un sourcil, impressionné·e malgré lui·elle*", "*fait semblant de ne pas être épaté·e*"],
+  aloof:   ["*feint l'indifférence… mal*", "*détourne le regard, l'air de rien*"],
+  sincere: ["*touché·e par ta franchise*", "*s'adoucit d'un coup*"],
+  cheeky:  ["*plisse les yeux, amusé·e*", "*prend le défi très au sérieux*"]
+};
+
 /* ---- Les SUJETS de conversation ----
    openers  : ce que dit l'IA pour lancer/relancer le sujet
    responses: réponses contextuelles ; beat = angle/personnalité, int = intensité,
@@ -214,7 +227,20 @@ function beatPreference(beat, cat, affinity){
 }
 
 export function initDialog(myCat, cat){
-  return { affinity: 34, patience: 100, turn: 0, topic: null, lastValence: "neutral", ended: null, opened: false, llmChoices: null };
+  return { affinity: 34, patience: 100, turn: 0, topic: null, lastValence: "neutral", ended: null, opened: false, llmChoices: null, seen: [], usedOpeners: {} };
+}
+
+/* Renvoie un opener du sujet SANS le répéter tant que le sujet n'a pas été
+   épuisé (mémorisé dans st.usedOpeners) -> plus jamais "deux fois la même question". */
+function freshOpener(topicKey, st, rng){
+  const openers = TOPICS[topicKey].openers;
+  if(!st.usedOpeners) st.usedOpeners = {};
+  let used = st.usedOpeners[topicKey] || [];
+  let pool = openers.map((_, i) => i).filter(i => !used.includes(i));
+  if(!pool.length){ pool = openers.map((_, i) => i); used = []; }
+  const idx = pool[rng.int(0, pool.length - 1)];
+  st.usedOpeners[topicKey] = [...used, idx];
+  return openers[idx];
 }
 
 export function moodLabel(state){
@@ -329,7 +355,8 @@ export function applyChoice(choice, myCat, cat, state, llmTurn){
   const userText = stylizeUserLine(fillTpl(choice.line, myCat, cat), myCat.persona, rng);
   const userMsg = { fromId: myCat.id, text: userText, beat: choice.beat, valence, tplKey: tplKey(choice.beat, choice.line) };
 
-  const nextState = { ...state, affinity, patience, turn: state.turn+1, lastValence: valence, opened: true, llmChoices: null };
+  const nextState = { ...state, affinity, patience, turn: state.turn+1, lastValence: valence, opened: true, llmChoices: null,
+    seen: Array.isArray(state.seen) ? [...state.seen] : [], usedOpeners: { ...(state.usedOpeners || {}) } };
 
   let ending = null;
   if(affinity <= 6 || patience <= 0){ ending = "blocked"; nextState.ended = "blocked"; }
@@ -346,17 +373,26 @@ export function applyChoice(choice, myCat, cat, state, llmTurn){
     if(llmTurn.topic) nextState.topic = llmTurn.topic;
     if(Array.isArray(llmTurn.choices) && llmTurn.choices.length >= 3) nextState.llmChoices = llmTurn.choices;
   } else {
-    // réaction à ta réponse + relance sur un sujet LIÉ (le fil continue)
+    // réaction à ta réponse + relance sur un sujet FRAIS (le fil continue sans tourner en rond)
     const picky = cat.pickiness > 55;
     const pool = valence === "pos" ? (picky ? REACT.posPicky : REACT.pos)
               : valence === "neg" ? (picky ? REACT.negPicky : REACT.neg)
               : REACT.neutral;
     const cur = TOPICS[state.topic] ? state.topic : START_TOPICS[0];
-    const links = TOPICS[cur].links.filter(t => t !== cur);
-    const nextTopic = pickFrom(links.length ? links : Object.keys(TOPICS), rng);
-    const opener = pickFrom(TOPICS[nextTopic].openers, rng);
+
+    // Sujet suivant : on évite tout sujet vu récemment (mémoire ~5 sujets).
+    const usedSet = new Set([...nextState.seen, cur]);
+    let cands = TOPICS[cur].links.filter(t => !usedSet.has(t));
+    if(!cands.length) cands = Object.keys(TOPICS).filter(t => !usedSet.has(t));
+    if(!cands.length) cands = TOPICS[cur].links.filter(t => t !== cur);   // dernier recours
+    const nextTopic = pickFrom(cands, rng);
     nextState.topic = nextTopic;
-    aiMsg = { fromId: cat.id, text: fillTpl(pickFrom(pool, rng) + " " + opener, myCat, cat), beat:"react", valence, tplKey:null };
+    nextState.seen = [...nextState.seen, cur].slice(-5);
+
+    const opener = freshOpener(nextTopic, nextState, rng);          // opener jamais répété
+    const cbPool = CALLBACK[choice.beat];
+    const cb = (cbPool && rng.float() < 0.55) ? pickFrom(cbPool, rng) + " " : "";  // rappel réactif ~1/2
+    aiMsg = { fromId: cat.id, text: fillTpl(cb + pickFrom(pool, rng) + " " + opener, myCat, cat), beat:"react", valence, tplKey:null };
   }
 
   return { userMsg, aiMsg, state: nextState, ending, delta };
