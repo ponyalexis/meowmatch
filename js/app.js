@@ -556,14 +556,18 @@ function openProfileSheet(cat, act){
 function showMatchModal(cat){
   const my = Store.getState().myCat;
   const conf = Array.from({length:14}, (_,i)=>`<span class="confetti" style="left:${i*7}%;animation-delay:${i*0.12}s">${['🎉','💛','🐾','😻','✨'][i%5]}</span>`).join("");
-  const modal = h(`<div class="match-modal">${conf}<div style="position:relative;z-index:2">
-    <h1>C'est un match !</h1><div class="avas"></div>
+  const modal = h(`<div class="match-modal">${conf}<div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center">
+    <h1>C'est un match !</h1>
+    <div class="subtitle">L'étincelle est là. Une nouvelle histoire commence.</div>
+    <div class="avas"></div>
     <p><b>${esc(my?.name||'Ton chat')}</b> et <b>${esc(cat.name)}</b> se plaisent. À toi d'orienter la conversation de leurs IA… 😽</p>
-    <button class="btn" id="goChat">Démarrer la conversation 💬</button>
-    <button class="btn ghost" id="keepSwipe" style="color:#fff;margin-top:4px">Continuer à swiper</button></div></div>`);
+    <button class="btn" id="goChat">💬 Démarrer la conversation</button>
+    <button class="btn ghost" id="keepSwipe" style="color:#eeddf4;margin-top:4px">Continuer à swiper</button>
+    <div class="kicker">MeowMatch Exclusive</div></div></div>`);
   const avas = modal.querySelector(".avas");
   avas.appendChild(imgWithFallback(my||cat, avatarUrl(my||cat)));
   avas.appendChild(imgWithFallback(cat, avatarUrl(cat)));
+  avas.appendChild(h(`<div class="heart-burst">❤️</div>`));
   modal.querySelector("#goChat").addEventListener("click", () => { modal.remove(); go("chat/m_"+cat.id); });
   modal.querySelector("#keepSwipe").addEventListener("click", () => modal.remove());
   document.body.appendChild(modal);
@@ -581,28 +585,32 @@ function dailyRewardModal(isNewDay=false){
   const bg = h(`<div class="sheet-bg"></div>`);
   const modal = h(`<div class="reward-modal">
     <div class="rw-card">
-      <div class="rw-flame">🔥</div>
-      <h2 class="serif">Série de ${d.streak} jour${d.streak>1?'s':''} !</h2>
-      <p class="mute">${isNewDay?'Content·e de te revoir 🥰 Voici ton rendez-vous quotidien.':'Reviens chaque jour pour garder ta série et gagner des super-likes.'}</p>
-      <div class="paw-row">${paws}</div>
+      <span class="rw-badge">Retour quotidien</span>
+      <h2 class="serif">Ton rendez-vous quotidien 🎁</h2>
+      <p class="mute">${isNewDay?'Content·e de te revoir 🥰 Série de '+d.streak+' jour'+(d.streak>1?'s':'')+' 🔥':'Un petit cadeau pour toi et ton félin. Série de '+d.streak+' jour'+(d.streak>1?'s':'')+' 🔥'}</p>
       <div class="rw-gift" id="giftBox">${d.claimed
         ? `<div class="rw-claimed">✅ Cadeau du jour déjà réclamé — reviens demain !</div>`
-        : `<button class="btn" id="claimBtn">🎁 Ouvrir mon cadeau</button>`}</div>
-      <button class="btn ghost" id="rwClose" style="margin-top:6px">${d.claimed?'Fermer':'Plus tard'}</button>
+        : `<button class="rw-mystery" id="mysteryBtn"><span class="rw-mystery-ico">🎁</span><span class="rw-mystery-lbl">Tapote pour révéler</span></button>`}</div>
+      <div class="paw-row">${paws}</div>
+      ${d.claimed?'':`<button class="btn" id="claimBtn" style="margin-top:14px">Récupérer mon cadeau</button>`}
+      <button class="btn ghost" id="rwClose" style="margin-top:6px">${d.claimed?'Fermer':'Reviens demain'}</button>
     </div>
   </div>`);
   const close = () => { bg.remove(); modal.remove(); };
   bg.addEventListener("click", close);
   modal.querySelector("#rwClose").addEventListener("click", close);
-  modal.querySelector("#claimBtn")?.addEventListener("click", () => {
+  const doClaim = () => {
     const r = Store.claimDaily();
     if(r){
       const box = modal.querySelector("#giftBox");
       box.innerHTML = `<div class="rw-reveal">+${r.superLikes} super-likes ⭐<br><small>ajoutés à ton compte</small></div>`;
+      modal.querySelector("#claimBtn")?.remove();
       confettiBurst();
-      setTimeout(() => { close(); render(); }, 1400);
+      setTimeout(() => { close(); render(); }, 1600);
     }
-  });
+  };
+  modal.querySelector("#claimBtn")?.addEventListener("click", doClaim);
+  modal.querySelector("#mysteryBtn")?.addEventListener("click", doClaim);
   document.body.append(bg, modal);
 }
 
@@ -762,12 +770,12 @@ function renderChat(matchId){
       return;
     }
     const choices = Dlg.getChoices(d, my, cat);
-    const head = h(`<div class="choices-head">Que fait dire ${esc(my?.name||'ton chat')} ? <button class="auto-mini" id="autoMini">${auto?'⏸':'🍿'} regarder</button></div>`);
+    const head = h(`<div class="choices-head"><span class="ch-title">Que répondre&nbsp;?</span> <button class="auto-mini" id="autoMini">${auto?'⏸':'🍿'} regarder</button></div>`);
     head.querySelector("#autoMini").addEventListener("click", toggleAuto);
     choicesBox.appendChild(head);
     const grid = h(`<div class="choices"></div>`);
     choices.forEach(c => {
-      const btn = h(`<button class="choice-btn"><span class="c-emoji">${c.emoji}</span><span>${esc(c.label)}</span></button>`);
+      const btn = h(`<button class="choice-btn"><span class="c-emoji">${c.emoji}</span><span class="c-lbl">${esc(c.label)}</span><span class="c-chev">›</span></button>`);
       btn.addEventListener("click", () => play(c));
       grid.appendChild(btn);
     });
@@ -787,7 +795,11 @@ function renderChat(matchId){
     res.aiMsg.ts = Date.now(); match.messages.push(res.aiMsg); scroll.appendChild(bubble(res.aiMsg)); scroll.scrollTop = scroll.scrollHeight;
     match.dialog = res.state; match.lastTs = Date.now();
     updateBars(); Store.saveMatch(match);
-    if(res.delta !== 0) toast((res.delta>0?"+":"")+res.delta+" complicité");
+    if(res.delta > 0){
+      const chip = h(`<div class="reward-chip">✨ +${res.delta} complicité</div>`);
+      scroll.appendChild(chip); scroll.scrollTop = scroll.scrollHeight;
+      setTimeout(() => chip.remove(), 2600);
+    } else if(res.delta < 0){ toast(res.delta + " complicité 😿"); }
     if(res.ending === "soulmate") celebrate();
     renderChoices();
   }

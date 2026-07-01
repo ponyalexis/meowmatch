@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#FF7A6B" />
+  <meta name="theme-color" content="#a43a3a" />
   <meta name="description" content="MeowMatch — l'app de rencontre pour chats parisiens. Swipe, matche, et lis les conversations de vos chats générées par IA." />
   <title>MeowMatch 🐾 — Rencontres félines</title>
 
@@ -13,11 +13,12 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,500;1,600&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body>
+  <div class="film-grain" aria-hidden="true"></div>
   <div id="app" class="app-shell"></div>
 
   <!-- Bottom navigation (rendered by app.js, kept in DOM for stability) -->
@@ -25,8 +26,8 @@
     <button class="tab" data-route="discover" aria-label="Découvrir">
       <span class="tab-ico">🔥</span><span class="tab-lbl">Découvrir</span>
     </button>
-    <button class="tab" data-route="matches" aria-label="Matchs">
-      <span class="tab-ico">💬</span><span class="tab-lbl">Matchs</span>
+    <button class="tab" data-route="matches" aria-label="Histoires">
+      <span class="tab-ico">📖</span><span class="tab-lbl">Histoires</span>
       <span class="tab-badge" id="matchBadge" hidden>0</span>
     </button>
     <button class="tab" data-route="profile" aria-label="Mon chat">
