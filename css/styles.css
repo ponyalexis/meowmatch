@@ -386,6 +386,14 @@ input[type=range]{flex:1;accent-color:var(--coral)}
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ------- compatibilité ------- */
+.card-info .meta span.match-chip{background:var(--grad-warm);color:#fff;font-weight:700}
+.compat-card{border:1px solid var(--peach)}
+.compat-top{display:flex;justify-content:space-between;align-items:center}
+.compat-label{font-family:"EB Garamond","Fraunces",serif;font-style:italic;font-size:18px;color:var(--coral);margin-top:2px}
+.compat-score{font-family:"EB Garamond","Fraunces",serif;font-size:34px;font-weight:700;color:var(--coral);line-height:1}
+.compat-score small{font-size:15px;font-weight:600}
+
 /* ------- streak & likes pills ------- */
 .pill.streak{color:var(--coral-deep);font-weight:800;background:#FFF3EF;border-color:var(--peach)}
 .pill.streak b{color:var(--coral-deep)}

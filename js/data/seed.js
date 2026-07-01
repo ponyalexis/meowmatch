@@ -1,6 +1,7 @@
 import { RNG } from "../rng.js";
 import * as P from "./pools.js";
 import { CAT_IMAGES } from "./cataas-ids.js";
+import { GENERATED } from "./generated-photos.js";
 
 // Point de référence par défaut : centre de Paris (Hôtel de Ville).
 export const PARIS_CENTER = { lat: 48.8566, lng: 2.3522 };
@@ -77,8 +78,17 @@ export function makeCat(i){
   // Petit décalage géographique dans le quartier
   const loc = { lat: hood.lat + (rng.float()-0.5)*0.012, lng: hood.lng + (rng.float()-0.5)*0.012 };
 
-  // 5 photos = LE MÊME chat, 5 ambiances -> cohérence visuelle garantie.
-  const photos = P.PHOTO_STYLES.map(style => ({ url: photoUrl(image.id, style), caption: style.caption }));
+  // 5 photos qui présentent le chat SELON SON ARCHÉTYPE en situation de vie courante.
+  // Si des images générées par IA existent (manifeste), on les utilise ; sinon on
+  // retombe sur la vraie photo cataas (le MÊME chat, cadrages variés).
+  const scenes = P.ARCHETYPE_SCENES[archetype.key] || P.ARCHETYPE_SCENES.potdecolle;
+  const gen = GENERATED[`cat_${i}`];
+  const photos = scenes.map((sc, k) => ({
+    url: (gen && gen[k]) ? gen[k] : photoUrl(image.id, P.PHOTO_STYLES[k]),
+    caption: sc.cap,
+    scene: sc.scene,
+    generated: !!(gen && gen[k])
+  }));
 
   const prompts = rng.sample(P.PROMPTS, 3).map(pr => ({ q: pr.q, a: rng.pick(pr.a) }));
 
@@ -133,6 +143,7 @@ export function makeCat(i){
     personality: traits,
     stats,
     pickiness,                                    // 0-95 : plus c'est haut, plus il·elle est exigeant·e
+    attractMode: rng.bool(0.5) ? "similar" : "opposite",  // qui se ressemble s'assemble / les contraires s'attirent
     lookingFor: rng.pick(P.LOOKING_FOR),
     dealbreaker: rng.pick(P.DEALBREAKERS),
     favorites: {

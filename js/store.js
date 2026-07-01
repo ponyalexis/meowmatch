@@ -1,4 +1,5 @@
 import { generateSeed, PARIS_CENTER, distanceKm } from "./data/seed.js";
+import { matchProbability } from "./engine/matchmaking.js";
 
 const KEY = "meow.state.v1";
 
@@ -122,8 +123,9 @@ export function like(catId){
   if(!state.seen.includes(catId)){ state.seen.push(catId); }
   if(!state.likes.includes(catId)) state.likes.push(catId);
   const cat = catById(catId);
-  // Logique de match : bots -> toujours match ; "vrais" chats -> proba selon compat.
-  const willMatch = cat.isBot ? true : Math.random() < 0.72;
+  // Logique de match : bots -> toujours match ; "vrais" chats -> proba selon la compatibilité.
+  const compat = matchProbability(state.myCat, cat).score;   // 28-99
+  const willMatch = cat.isBot ? true : Math.random() < (0.30 + compat/200);
   let created = false;
   if(willMatch && !state.matches.find(m => m.catId === catId)){
     state.matches.unshift({

@@ -135,14 +135,104 @@ export const COLOR_PROFILES = {
   divers:   { emoji:"🐾", coat:"au charme unique",              breeds:["Européen (chat de gouttière)","Chat des toits parisiens"] }
 };
 
-// Déclinaisons photo à partir d'UN SEUL chat : même animal, ambiances différentes.
+// Variantes photo de secours (si pas d'images générées) : cadrages différents
+// du MÊME chat, sans filtre "photobooth". Utilisé uniquement en fallback.
 export const PHOTO_STYLES = [
-  { q:"&position=center",                            caption:"Au naturel" },
-  { q:"&position=top&brightness=1.08&saturation=1.12", caption:"Golden hour ✨" },
-  { q:"&position=bottom&saturation=1.18",            caption:"Séance canapé" },
-  { q:"&filter=mono",                                caption:"Portrait de star 🖤" },
-  { q:"&position=right&brightness=1.05&saturation=1.2", caption:"Rêveur·se à la fenêtre" }
+  { q:"&position=center" },
+  { q:"&position=top&brightness=1.04" },
+  { q:"&position=bottom" },
+  { q:"&position=left&brightness=1.03&saturation=1.06" },
+  { q:"&position=right&saturation=1.08" }
 ];
+
+// Scènes de vie courante par archétype -> légende affichée + description pour la
+// génération d'images (5 par archétype, dans l'ordre des 5 photos).
+export const ARCHETYPE_SCENES = {
+  potdecolle: [
+    { cap:"Lové contre son humain",         scene:"blotti tendrement contre l'épaule de son humain sur un canapé" },
+    { cap:"Sur les genoux, refuse de bouger", scene:"installé sur les genoux de son humain qui télétravaille" },
+    { cap:"À la fenêtre, à attendre",       scene:"assis à la fenêtre guettant le retour de son humain" },
+    { cap:"Sieste sur l'oreiller partagé",  scene:"endormi sur un oreiller à côté d'un humain au réveil" },
+    { cap:"Câlin du matin",                 scene:"réclamant un câlin en se frottant contre une jambe dans la cuisine" }
+  ],
+  aventurier: [
+    { cap:"Exploration du balcon",          scene:"explorant prudemment un balcon parisien fleuri en hauteur" },
+    { cap:"Perché sur la bibliothèque",     scene:"perché tout en haut d'une grande bibliothèque, fier" },
+    { cap:"À l'affût derrière la vitre",    scene:"observant la rue derrière une fenêtre, curieux" },
+    { cap:"En équilibre sur le rebord",     scene:"en équilibre sur le rebord d'une fenêtre ouverte" },
+    { cap:"Découverte d'un carton",         scene:"la tête plongée dans un carton de déménagement mystérieux" }
+  ],
+  diva: [
+    { cap:"Sur son trône de velours",       scene:"trônant majestueusement sur un fauteuil de velours" },
+    { cap:"Pose royale au soleil",          scene:"posant élégamment dans un rayon de soleil doré" },
+    { cap:"Toilette raffinée",              scene:"faisant sa toilette avec grâce sur un plaid douillet" },
+    { cap:"Le plus beau coussin",           scene:"allongé sur le plus luxueux coussin du salon" },
+    { cap:"Regard hautain",                 scene:"jetant un regard hautain depuis le haut du canapé" }
+  ],
+  chasseur: [
+    { cap:"Embuscade derrière le rideau",   scene:"tapi en embuscade derrière un rideau, prêt à bondir" },
+    { cap:"Guet du pigeon",                 scene:"fixant intensément un pigeon derrière la vitre" },
+    { cap:"Bond sur la canne à plumes",     scene:"bondissant sur une canne à plumes en plein jeu" },
+    { cap:"Yeux de traqueur",               scene:"les pupilles dilatées, en position de chasse au sol" },
+    { cap:"Retour de chasse",               scene:"trottant fièrement avec une souris en peluche dans la gueule" }
+  ],
+  philosophe: [
+    { cap:"Contemplation à la fenêtre",     scene:"contemplant la pluie derrière une fenêtre, pensif" },
+    { cap:"Méditation sur le tapis",        scene:"en boule sur un tapis, l'air méditatif" },
+    { cap:"Songeur au crépuscule",          scene:"assis au coucher du soleil, regard songeur" },
+    { cap:"Sieste sur les livres",          scene:"endormi paisiblement sur une pile de vieux livres" },
+    { cap:"Observation silencieuse",        scene:"observant le monde en silence depuis une étagère" }
+  ],
+  clown: [
+    { cap:"Position absurde",               scene:"renversé sur le dos dans une position comique sur le canapé" },
+    { cap:"Coincé (exprès) dans un carton", scene:"à moitié coincé dans un carton trop petit, l'air ravi" },
+    { cap:"Jeu avec un bouchon",            scene:"jouant frénétiquement avec un bouchon de bouteille" },
+    { cap:"La tête dans un sac",            scene:"la tête passée dans l'anse d'un sac en papier" },
+    { cap:"Roulade sur le tapis",           scene:"en pleine roulade joueuse sur un tapis" }
+  ],
+  gourmand: [
+    { cap:"À l'affût de la gamelle",        scene:"assis devant sa gamelle vide, le regard implorant" },
+    { cap:"Quête sur le plan de travail",   scene:"inspectant le plan de travail de la cuisine" },
+    { cap:"Yeux implorants à table",        scene:"quémandant à table avec de grands yeux" },
+    { cap:"Sieste repue",                   scene:"endormi, le ventre rond, après un bon repas" },
+    { cap:"Inspection du frigo",            scene:"la tête tournée vers un frigo entrouvert, gourmand" }
+  ],
+  athlete: [
+    { cap:"Saut vers l'étagère",            scene:"en plein saut spectaculaire vers une étagère" },
+    { cap:"Course dans le couloir",         scene:"en pleine course effrénée dans un couloir" },
+    { cap:"Escalade de l'arbre à chat",     scene:"grimpant énergiquement au sommet d'un arbre à chat" },
+    { cap:"Étirement parfait",              scene:"réalisant un étirement parfait au réveil" },
+    { cap:"Parkour sur le canapé",          scene:"bondissant d'un accoudoir à l'autre du canapé" }
+  ],
+  timide: [
+    { cap:"Caché sous le lit",              scene:"à moitié caché sous un lit, seuls les yeux visibles" },
+    { cap:"Œil sous la couverture",         scene:"emmitouflé sous une couverture, un œil qui dépasse" },
+    { cap:"Observation prudente",           scene:"observant de loin depuis l'embrasure d'une porte" },
+    { cap:"Blotti dans un coin",            scene:"blotti timidement dans un coin douillet" },
+    { cap:"Sortie timide au soleil",        scene:"s'aventurant timidement vers un rayon de soleil" }
+  ],
+  seducteur: [
+    { cap:"Regard envoûtant",               scene:"fixant l'objectif avec un regard charmeur et envoûtant" },
+    { cap:"Pose alanguie",                  scene:"allongé langoureusement sur un sofa" },
+    { cap:"Clignement charmeur",            scene:"clignant lentement des yeux, séducteur" },
+    { cap:"Étirement gracieux",             scene:"s'étirant gracieusement dans la lumière du soir" },
+    { cap:"Ronron sur les genoux",          scene:"ronronnant, blotti sur des genoux accueillants" }
+  ],
+  bavard: [
+    { cap:"Miaulement expressif",           scene:"la gueule ouverte en plein miaulement expressif" },
+    { cap:"Réclame l'attention",            scene:"miaulant fort pour réclamer l'attention dans le salon" },
+    { cap:"Conversation à la fenêtre",      scene:"'discutant' avec les oiseaux à la fenêtre" },
+    { cap:"Commente le repas",              scene:"miaulant devant sa gamelle comme pour commenter" },
+    { cap:"En pleine histoire",             scene:"la bouche ouverte, comme en train de raconter une histoire" }
+  ],
+  zen: [
+    { cap:"Détente sur le radiateur",       scene:"parfaitement détendu, allongé sur un radiateur tiède" },
+    { cap:"Yoga félin au soleil",           scene:"étiré au soleil dans une posture de yoga féline" },
+    { cap:"Sieste imperturbable",           scene:"en sieste profonde, imperturbable, sur un fauteuil" },
+    { cap:"Pose du chat zen",               scene:"assis calmement en position du sphinx, serein" },
+    { cap:"Calme près de la plante",        scene:"posé sereinement à côté d'une plante verte" }
+  ]
+};
 
 // Trait signature imposé par l'archétype (garantit la cohérence de caractère).
 export const ARCHETYPE_TRAIT = {

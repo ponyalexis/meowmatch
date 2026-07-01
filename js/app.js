@@ -4,6 +4,7 @@ import { ARCHETYPES, PERSONALITY_TAGS, LOOKING_FOR, NEIGHBORHOODS } from "./data
 import * as Engine from "./engine/chat-engine.js";
 import * as Dlg from "./engine/dialogue-engine.js";
 import { synthesizePersona, personaLabel, stylizeUserLine } from "./engine/persona.js";
+import { matchProbability } from "./engine/matchmaking.js";
 import * as LLM from "./engine/llm-adapter.js";
 
 const app = document.getElementById("app");
@@ -394,7 +395,8 @@ function renderDiscover(){
       <div class="card-info">
         <div class="name-row"><h2>${esc(cat.name)}</h2><span class="age">${esc(cat.ageLabel)}</span>
           ${cat.verified?'<span class="verif">✅</span>':''}${cat.isBot?'<span class="bot-tag">IA</span>':''}</div>
-        <div class="meta"><span>📍 ${cat.distanceKm.toFixed(1)} km</span>
+        <div class="meta"><span class="match-chip">💘 ${matchProbability(st.myCat, cat).score}%</span>
+          <span>📍 ${cat.distanceKm.toFixed(1)} km</span>
           <span>${cat.archetype.emoji} ${esc(cat.archetype.label)}</span>
           <span>${cat.colorEmoji} ${esc(cat.breed.replace(/\s*\(.*\)/,''))}</span>
           ${cat.pickiness>65?'<span>😼 dur·e de la feuille</span>':''}</div>
@@ -518,6 +520,18 @@ function openFilters(){
 /* ============================================================
    PROFILE SHEET
    ============================================================ */
+function compatCardHtml(cat){
+  const my = Store.getState().myCat;
+  if(!my || cat.id === "me" || cat.id === my.id) return "";
+  const m = matchProbability(my, cat);
+  const modeLbl = m.mode === "similar" ? "Qui se ressemble s'assemble" : "Les contraires s'attirent";
+  return `<div class="info-card compat-card">
+    <div class="compat-top"><div><h4 style="margin:0">Compatibilité</h4><div class="compat-label">${esc(m.label)}</div></div><div class="compat-score">${m.score}<small>%</small></div></div>
+    <div class="bar" style="height:8px;border-radius:5px;background:#e7e2dc;overflow:hidden;margin:10px 0 8px"><i style="display:block;height:100%;width:${m.score}%;background:var(--grad-warm)"></i></div>
+    <p style="margin:0;font-size:13.5px;color:var(--ink-soft)">${esc(m.reason)} <span style="opacity:.7">· ${esc(modeLbl)}</span></p>
+  </div>`;
+}
+
 function openProfileSheet(cat, act){
   const bg = h(`<div class="sheet-bg"></div>`);
   const statLabels = { playfulness:"Joueur", laziness:"Marmotte", affection:"Câlin", independence:"Indépendant", chattiness:"Bavard", curiosity:"Curieux" };
@@ -525,7 +539,8 @@ function openProfileSheet(cat, act){
     <div class="body">
       <h2 class="name serif">${esc(cat.name)}, ${esc(cat.ageLabel)} ${cat.isBot?'<span class="bot-tag">IA</span>':''}</h2>
       <div class="subline">${cat.archetype.emoji} ${esc(cat.archetype.label)} · ${cat.colorEmoji} ${esc(cat.breed)} · 📍 ${esc(cat.neighborhood)}</div>
-      ${cat.persona?`<div class="info-card prompt-card"><h4>S'il·elle était humain·e</h4><div class="a">${esc(cat.persona.human)} — un peu comme ${esc(cat.persona.celeb)} ${cat.persona.emoji}</div></div>`:''}
+      ${compatCardHtml(cat)}
+      ${cat.persona?`<div class="info-card prompt-card"><h4>S'il·elle était humain·e</h4><div class="a">${esc(cat.persona.human)} — dans la lignée de ${esc(cat.persona.celeb)} ${cat.persona.emoji}</div></div>`:''}
       <div class="info-card"><h4>À propos</h4><p>${esc(cat.bio)}</p></div>
       ${cat.prompts?.[0]?`<div class="info-card prompt-card"><h4>${esc(cat.prompts[0].q)}</h4><div class="a">${esc(cat.prompts[0].a)}</div></div>`:''}
       <div class="info-card"><h4>Caractère</h4><div class="factbox">${cat.personality.map(t=>`<span class="fact">${esc(t)}</span>`).join("")}</div></div>
@@ -836,9 +851,9 @@ function renderChat(matchId){
     const t = typing(true);
     setTimeout(() => {
       if(myToken!==viewToken) return; t.remove();
-      const open = Dlg.openingMessage(my, cat); open.ts = Date.now();
-      match.messages.push(open); match.dialog.opened = true;
-      scroll.appendChild(bubble(open)); scroll.scrollTop = scroll.scrollHeight;
+      const ex = Dlg.openingExchange(my, cat); ex.message.ts = Date.now();
+      match.messages.push(ex.message); match.dialog.opened = true; match.dialog.topic = ex.topic;
+      scroll.appendChild(bubble(ex.message)); scroll.scrollTop = scroll.scrollHeight;
       Store.saveMatch(match); renderChoices();
     }, 700);
   } else {

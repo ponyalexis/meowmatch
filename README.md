@@ -34,6 +34,40 @@ Pour tester la géoloc et l'installation PWA, sers en HTTPS (ex. `npx serve` + u
 
 > 📸 Les photos viennent de cataas.com (vraies photos de chats). Hors-ligne, un avatar SVG mignon prend le relais automatiquement.
 
+## 📸 Générer les photos par IA (image-to-image)
+
+Par défaut, chaque profil épingle **une vraie photo cataas** (identité stable) et l'app présente
+5 **scènes de vie courante selon l'archétype** (légendes). Pour de vraies photos distinctes du
+**même chat** dans chaque scène, un pipeline génère les images en **image-to-image** à partir de
+la photo de référence :
+
+```bash
+# aperçu des prompts (sans clé) :
+node tools/generate-cat-photos.mjs --dry-run --limit 3
+
+# génération réelle (Node >= 18) — provider pluggable :
+IMG_API_URL="https://ton-provider/v1/images" IMG_API_KEY="sk-…" IMG_MODEL="flux-1.1-pro" \
+  node tools/generate-cat-photos.mjs
+```
+
+Le script source la photo cataas, construit un prompt « scène d'archétype » (ex. *diva → trônant
+sur un fauteuil de velours*), appelle le modèle en le conditionnant sur la référence (même robe,
+même morphologie), sauve dans `assets/cats/<id>/` et écrit `js/data/generated-photos.js` — que
+l'app lit automatiquement (sinon fallback cataas). Adapte `callImageModel()` à ton fournisseur
+(FLUX, Imagen, gpt-image, SD3.5…). ⚠️ Nécessite une clé d'API d'un modèle d'images.
+
+## 💘 Compatibilité & 🧠 personnalité
+
+- **Probabilité de match** (`js/engine/matchmaking.js`) : score 0-100 affiché sur chaque carte et
+  fiche, calculé vs. ton chat selon **« qui se ressemble s'assemble »** ou **« les contraires
+  s'attirent »** (chaque chat penche pour l'un des deux). Le score influe aussi sur la chance de match.
+- **Persona historique** (`js/engine/persona.js`) : le chat de l'utilisateur est rapproché d'une
+  **grande figure historique** selon son archétype et ses curseurs (ex. diva ♀ → Cléopâtre, ♂ →
+  Louis XIV ; philosophe → Socrate / Hypatie). Ses répliques sont restylées dans cet esprit.
+- **Dialogue threadé à choix** (`js/engine/dialogue-engine.js`) : chaque message de l'IA porte sur
+  un **sujet** ; tes **3 réponses sont contextuelles** à ce sujet, et la relance rebondit puis
+  glisse vers un sujet lié — un vrai fil qui peut mener à 💛 âme sœur ou 🙈 blocage.
+
 ## 🧠 Brancher un vrai LLM (optionnel)
 
 Par défaut, tout est **généré localement** (aucune clé, aucun réseau requis pour les dialogues).
