@@ -71,11 +71,13 @@ function setActiveTab(route){
 }
 tabbar.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => go(t.dataset.route)));
 
+let pendingDaily = false;
 function render(){
   viewToken++;
   const route = currentRoute();
   const st = Store.getState();
   if(!st.onboarded && route !== "onboard"){ go("onboard"); return; }
+  if(st.onboarded && Store.ensureDaily()) pendingDaily = true;   // nouveau jour -> cadeau à réclamer
   app.innerHTML = ""; setActiveTab(route); window.scrollTo(0,0);
   const base = route.split("/")[0];
   if(base === "onboard") return renderHero();
@@ -317,9 +319,16 @@ function makeRng(seed){ // petit RNG local pour le reveal
    ============================================================ */
 function renderDiscover(){
   const st = Store.getState();
+  const d = Store.daily();
   const wrap = h(`<div>
-    <header class="topbar"><div class="brand"><span class="paw">🐾</span>Meow<b>Match</b></div>
-      <button class="pill" id="filterPill">⚙️ ${st.settings.radiusKm} km</button></header>
+    <header class="topbar">
+      <button class="pill streak" id="streakPill">🔥 <b>${d.streak||1}</b></button>
+      <div class="brand" style="font-size:18px"><span class="paw">🐾</span>Meow<b>Match</b></div>
+      <div style="display:flex;gap:6px">
+        <button class="pill likes" id="likesPill">❤️ ${Store.likesLeft()}</button>
+        <button class="pill" id="filterPill">⚙️</button>
+      </div>
+    </header>
     <div class="deck" id="deck"></div>
     <div class="deck-actions">
       <button class="round rewind" id="btnRewind" aria-label="Annuler">↩️</button>
@@ -339,9 +348,24 @@ function renderDiscover(){
   }
 
   wrap.querySelector("#filterPill").addEventListener("click", openFilters);
+  wrap.querySelector("#streakPill").addEventListener("click", () => dailyRewardModal());
+  wrap.querySelector("#likesPill").addEventListener("click", () => toast(`❤️ ${Store.likesLeft()} likes · ⭐ ${Store.superLeft()} super-likes aujourd'hui`));
   const deck = wrap.querySelector("#deck");
   let queue = Store.getDeck();
   let lastActed = null;
+
+  function refreshPills(){
+    const dd = Store.daily();
+    wrap.querySelector("#streakPill").innerHTML = `🔥 <b>${dd.streak||1}</b>`;
+    wrap.querySelector("#likesPill").textContent = `❤️ ${Store.likesLeft()}`;
+  }
+  function limitBlocked(kind){
+    if(kind === "star") return Store.superLeft() <= 0;
+    if(kind === "like") return Store.likesLeft() <= 0;
+    return false;
+  }
+  // Cadeau à réclamer sur nouvelle journée
+  if(pendingDaily){ pendingDaily = false; setTimeout(() => dailyRewardModal(true), 500); }
 
   function paint(){
     deck.innerHTML = "";
@@ -402,16 +426,26 @@ function renderDiscover(){
     const cat = queue[0]; if(!cat) return;
     lastActed = cat.id;
     if(kind === "like" || kind === "star"){
+      Store.useLike(kind);   // consomme le quota (déjà vérifié avant l'animation)
       const matched = Store.like(cat.id);
       if(matched) showMatchModal(cat);
       else toast(kind==="star" ? "Coup de cœur envoyé ⭐" : "Like envoyé ❤️");
     } else if(kind === "pass"){ Store.pass(cat.id); }
-    queue = Store.getDeck(); paint(); setActiveTab(currentRoute());
+    queue = Store.getDeck(); paint(); refreshPills(); setActiveTab(currentRoute());
+  }
+  // Gate d'un like/super-like : bloque avant l'animation si quota épuisé.
+  function tryAct(kind){
+    if(limitBlocked(kind)){
+      if(kind === "star") toast("Plus de super-likes aujourd'hui ⭐");
+      else outOfLikesModal();
+      return;
+    }
+    flyOut(kind, act);
   }
 
-  wrap.querySelector("#btnLike").addEventListener("click", () => flyOut("like", act));
+  wrap.querySelector("#btnLike").addEventListener("click", () => tryAct("like"));
   wrap.querySelector("#btnNope").addEventListener("click", () => flyOut("pass", act));
-  wrap.querySelector("#btnStar").addEventListener("click", () => flyOut("star", act));
+  wrap.querySelector("#btnStar").addEventListener("click", () => tryAct("star"));
   wrap.querySelector("#btnRewind").addEventListener("click", () => {
     if(!lastActed){ toast("Rien à annuler 🐾"); return; }
     Store.rewind(lastActed); lastActed=null; queue=Store.getDeck(); paint(); toast("Retour en arrière ↩️");
@@ -443,7 +477,10 @@ function renderDiscover(){
       if(dx>110) finish(1); else if(dx<-110) finish(-1);
       else { card.style.transform=""; likeStamp.style.opacity=0; nopeStamp.style.opacity=0; }
     };
-    function finish(dir){ card.style.transform=`translate(${dir*170}%, ${dy}px) rotate(${dir*22}deg)`; card.style.opacity="0"; setTimeout(()=>cb(dir>0?"like":"pass"),260); }
+    function finish(dir){
+      if(dir>0 && limitBlocked("like")){ card.style.transform=""; likeStamp.style.opacity=0; outOfLikesModal(); return; }
+      card.style.transform=`translate(${dir*170}%, ${dy}px) rotate(${dir*22}deg)`; card.style.opacity="0"; setTimeout(()=>cb(dir>0?"like":"pass"),260);
+    }
     card.addEventListener("pointerdown", down); card.addEventListener("pointermove", move);
     card.addEventListener("pointerup", upFn); card.addEventListener("pointercancel", upFn);
   }
@@ -530,6 +567,71 @@ function showMatchModal(cat){
   modal.querySelector("#goChat").addEventListener("click", () => { modal.remove(); go("chat/m_"+cat.id); });
   modal.querySelector("#keepSwipe").addEventListener("click", () => modal.remove());
   document.body.appendChild(modal);
+}
+
+/* ---- Cadeau quotidien + streak ---- */
+function dailyRewardModal(isNewDay=false){
+  const d = Store.daily();
+  const paws = Array.from({length:7}, (_,i) => {
+    const idx = ((d.streak-1) % 7);
+    const filled = i <= idx;
+    const glow = i === (idx+1) % 7 && !d.claimed;
+    return `<div class="paw-stamp ${filled?'on':''} ${glow?'glow':''}">🐾</div>`;
+  }).join("");
+  const bg = h(`<div class="sheet-bg"></div>`);
+  const modal = h(`<div class="reward-modal">
+    <div class="rw-card">
+      <div class="rw-flame">🔥</div>
+      <h2 class="serif">Série de ${d.streak} jour${d.streak>1?'s':''} !</h2>
+      <p class="mute">${isNewDay?'Content·e de te revoir 🥰 Voici ton rendez-vous quotidien.':'Reviens chaque jour pour garder ta série et gagner des super-likes.'}</p>
+      <div class="paw-row">${paws}</div>
+      <div class="rw-gift" id="giftBox">${d.claimed
+        ? `<div class="rw-claimed">✅ Cadeau du jour déjà réclamé — reviens demain !</div>`
+        : `<button class="btn" id="claimBtn">🎁 Ouvrir mon cadeau</button>`}</div>
+      <button class="btn ghost" id="rwClose" style="margin-top:6px">${d.claimed?'Fermer':'Plus tard'}</button>
+    </div>
+  </div>`);
+  const close = () => { bg.remove(); modal.remove(); };
+  bg.addEventListener("click", close);
+  modal.querySelector("#rwClose").addEventListener("click", close);
+  modal.querySelector("#claimBtn")?.addEventListener("click", () => {
+    const r = Store.claimDaily();
+    if(r){
+      const box = modal.querySelector("#giftBox");
+      box.innerHTML = `<div class="rw-reveal">+${r.superLikes} super-likes ⭐<br><small>ajoutés à ton compte</small></div>`;
+      confettiBurst();
+      setTimeout(() => { close(); render(); }, 1400);
+    }
+  });
+  document.body.append(bg, modal);
+}
+
+function outOfLikesModal(){
+  const d = Store.daily();
+  const bg = h(`<div class="sheet-bg"></div>`);
+  const modal = h(`<div class="reward-modal">
+    <div class="rw-card">
+      <div class="rw-flame">❤️</div>
+      <h2 class="serif">Plus de likes pour aujourd'hui</h2>
+      <p class="mute">Tu as utilisé tes 20 likes du jour. Reviens demain pour en avoir 20 nouveaux — et garder ta série de ${d.streak} 🔥.</p>
+      <button class="btn" id="refillBtn">▶️ Recharger mes likes <small style="opacity:.8">(démo)</small></button>
+      ${!d.claimed?`<button class="btn secondary" id="giftBtn" style="margin-top:8px">🎁 Ouvrir le cadeau du jour</button>`:''}
+      <button class="btn ghost" id="olClose" style="margin-top:6px">Revenir demain</button>
+    </div>
+  </div>`);
+  const close = () => { bg.remove(); modal.remove(); };
+  bg.addEventListener("click", close);
+  modal.querySelector("#olClose").addEventListener("click", close);
+  modal.querySelector("#refillBtn").addEventListener("click", () => { Store.refillLikes(); toast("Likes rechargés ❤️"); close(); render(); });
+  modal.querySelector("#giftBtn")?.addEventListener("click", () => { close(); dailyRewardModal(); });
+  document.body.append(bg, modal);
+}
+
+function confettiBurst(){
+  const conf = document.createElement("div");
+  conf.className = "match-modal"; conf.style.background = "transparent"; conf.style.pointerEvents = "none"; conf.style.zIndex = 80;
+  conf.innerHTML = Array.from({length:16},(_,i)=>`<span class="confetti" style="left:${i*6}%;animation-delay:${i*0.08}s">${['⭐','💛','✨','🐾'][i%4]}</span>`).join("");
+  document.body.appendChild(conf); setTimeout(()=>conf.remove(), 2400);
 }
 
 /* ============================================================

@@ -368,6 +368,37 @@ input[type=range]{flex:1;accent-color:var(--coral)}
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ------- streak & likes pills ------- */
+.pill.streak{color:var(--coral-deep);font-weight:800;background:#FFF3EF;border-color:var(--peach)}
+.pill.streak b{color:var(--coral-deep)}
+.pill.likes{color:var(--nope);font-weight:700}
+
+/* ------- reward / daily modal ------- */
+.reward-modal{
+  position:fixed;inset:0;z-index:61;display:grid;place-items:center;padding:26px;
+  background:radial-gradient(circle at 50% 30%,rgba(107,78,113,.55),rgba(42,36,50,.72));
+  animation:fade .25s ease;
+}
+.rw-card{
+  background:var(--cream);border-radius:26px;padding:26px 22px 20px;max-width:340px;width:100%;
+  text-align:center;box-shadow:var(--shadow-lg);animation:sheetUp .3s cubic-bezier(.2,.8,.2,1);
+}
+.rw-card h2{font-size:24px;margin:8px 0 6px}
+.rw-card .mute{font-size:14px;margin:0 0 16px}
+.rw-flame{font-size:52px;filter:drop-shadow(0 8px 14px rgba(255,122,107,.4));animation:float 3s ease-in-out infinite}
+.paw-row{display:flex;justify-content:center;gap:7px;margin:6px 0 18px}
+.paw-stamp{
+  width:34px;height:34px;border-radius:12px;display:grid;place-items:center;font-size:16px;
+  background:#EDE6DB;filter:grayscale(1) opacity(.5);transition:all .2s;
+}
+.paw-stamp.on{background:var(--grad-warm);filter:none;box-shadow:var(--shadow-sm)}
+.paw-stamp.glow{box-shadow:0 0 0 3px rgba(232,176,75,.5);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.rw-claimed{font-size:14px;color:var(--sage);font-weight:600;background:#F0FBF4;border:1px solid #BFead0;border-radius:12px;padding:12px}
+.rw-reveal{font-family:"Fraunces",serif;font-size:26px;color:var(--gold);font-weight:600;background:#FFF9EC;border:1px solid #F0D9A0;border-radius:14px;padding:16px;animation:pop .3s ease}
+.rw-reveal small{font-family:"Inter",sans-serif;font-size:12px;color:var(--ink-soft);font-weight:500}
+.rw-gift{margin-bottom:4px}
+
 /* ------- nudge (incitation photos) ------- */
 .nudge{
   margin:2px 14px 6px;padding:11px 14px;border-radius:14px;font-size:13px;line-height:1.35;

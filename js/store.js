@@ -11,8 +11,16 @@ const DEFAULT = {
   matches: [],             // [{id, catId, messages:[], affinity, createdAt, lastTs, unread, autoplay}]
   memory: { templateScores: {}, reactionsCount: 0 }, // apprentissage du moteur
   settings: { radiusKm: 15, showBots: true },
+  daily: { day: null, streak: 0, claimed: false, likesUsed: 0, superUsed: 0, superCredits: 0, best: 0 },
   onboarded: false
 };
+
+// Boucles addictives : limites quotidiennes.
+export const DAILY_LIKES = 20;
+export const DAILY_SUPER = 3;
+export const DAILY_REWARD_SUPER = 2;  // super-likes offerts par le cadeau du jour
+
+function dayNumber(){ const d = new Date(); return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000); }
 
 let state = load();
 const listeners = new Set();
@@ -20,7 +28,10 @@ const listeners = new Set();
 function load(){
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null");
-    if(raw) return { ...structuredClone(DEFAULT), ...raw, memory: { ...DEFAULT.memory, ...(raw.memory||{}) }, settings: { ...DEFAULT.settings, ...(raw.settings||{}) } };
+    if(raw) return { ...structuredClone(DEFAULT), ...raw,
+      memory: { ...DEFAULT.memory, ...(raw.memory||{}) },
+      settings: { ...DEFAULT.settings, ...(raw.settings||{}) },
+      daily: { ...DEFAULT.daily, ...(raw.daily||{}) } };
   } catch {}
   return structuredClone(DEFAULT);
 }
@@ -41,6 +52,55 @@ export function setLocation(loc){ state.location = loc; emit(); }
 export function updateSettings(patch){ state.settings = { ...state.settings, ...patch }; emit(); }
 
 export function resetAll(){ localStorage.removeItem(KEY); state = structuredClone(DEFAULT); emit(); }
+
+/* ---- Boucle quotidienne : streak + likes limités + cadeau ---- */
+// Bascule sur un nouveau jour si besoin. Retourne true si c'est un nouveau jour (cadeau à réclamer).
+export function ensureDaily(){
+  const today = dayNumber();
+  const d = state.daily || (state.daily = structuredClone(DEFAULT.daily));
+  if(d.day === today) return false;
+  let streak;
+  if(d.day == null) streak = 1;
+  else if(today - d.day === 1) streak = (d.streak || 0) + 1;   // journée consécutive
+  else streak = 1;                                              // streak cassé
+  state.daily = {
+    day: today, streak, claimed: false,
+    likesUsed: 0, superUsed: 0,
+    superCredits: d.superCredits || 0,
+    best: Math.max(d.best || 0, streak)
+  };
+  persist();
+  return true;
+}
+
+export function daily(){ return state.daily; }
+export function likesLeft(){ return Math.max(0, DAILY_LIKES - (state.daily.likesUsed||0)); }
+export function superLeft(){ return Math.max(0, DAILY_SUPER + (state.daily.superCredits||0) - (state.daily.superUsed||0)); }
+
+// Consomme un like/super-like. Retourne true si autorisé.
+export function useLike(kind){
+  if(kind === "star"){
+    if(superLeft() <= 0) return false;
+    state.daily.superUsed = (state.daily.superUsed||0) + 1;
+  } else {
+    if(likesLeft() <= 0) return false;
+    state.daily.likesUsed = (state.daily.likesUsed||0) + 1;
+  }
+  emit();
+  return true;
+}
+
+// Recharge les likes du jour (démo : simule une pub récompensée / un abonnement).
+export function refillLikes(){ state.daily.likesUsed = 0; emit(); }
+
+// Réclame le cadeau du jour (une fois par jour) -> crédits de super-likes.
+export function claimDaily(){
+  if(state.daily.claimed) return null;
+  state.daily.claimed = true;
+  state.daily.superCredits = (state.daily.superCredits||0) + DAILY_REWARD_SUPER;
+  emit();
+  return { superLikes: DAILY_REWARD_SUPER, streak: state.daily.streak };
+}
 
 // Deck filtré : non vus, dans le rayon, respect du filtre bots, trié par distance.
 export function getDeck(){
