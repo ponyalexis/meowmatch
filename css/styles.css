@@ -59,9 +59,19 @@ img{display:block}
   overflow-x:hidden;
 }
 .app-shell.no-tabbar{padding-bottom:calc(20px + var(--safe-bottom))}
-.app-shell.chat-mode{padding-bottom:0;display:flex;flex-direction:column;min-height:100dvh}
-.app-shell.chat-mode > div{display:flex;flex-direction:column;flex:1;min-height:100dvh}
-.app-shell.chat-mode .chat-scroll{flex:1;overflow-y:auto}
+/* Chat = cadre FIXE à la hauteur de l'écran ; seul .chat-scroll défile en interne
+   (height bornée + min-height:0 = le fix flexbox indispensable au scroll interne). */
+.app-shell.chat-mode{padding-bottom:0;display:flex;flex-direction:column;height:100dvh;min-height:0;overflow:hidden}
+.app-shell.chat-mode > div{display:flex;flex-direction:column;flex:1;min-height:0}
+.app-shell.chat-mode .chat-scroll{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;
+  /* les anciens messages se fondent doucement en haut du cadre */
+  -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 26px, #000 100%);
+  mask-image:linear-gradient(to bottom, transparent 0, #000 26px, #000 100%);
+}
+/* ancre les messages en bas quand ils ne remplissent pas encore le cadre */
+.app-shell.chat-mode .chat-scroll > :first-child{margin-top:auto}
 
 /* ------- Top bar ------- */
 .topbar{
