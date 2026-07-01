@@ -548,5 +548,8 @@ input[type=range]{flex:1;accent-color:var(--coral)}
 .center-col{display:flex;flex-direction:column;align-items:center;text-align:center}
 .mute{color:var(--ink-soft)}
 .hidden{display:none!important}
+/* L'attribut [hidden] doit vraiment masquer, même les éléments en display:flex/grid
+   (tabbar, badges…) dont la règle auteur écraserait sinon le display:none du navigateur. */
+[hidden]{display:none!important}
 .spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--coral);border-radius:50%;animation:rot 1s linear infinite;margin:30px auto}
 @keyframes rot{to{transform:rotate(360deg)}}

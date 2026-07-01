@@ -1,4 +1,5 @@
 import { generateSeed, PARIS_CENTER, distanceKm } from "./data/seed.js";
+import { GENERATED } from "./data/generated-photos.js";
 import { matchProbability } from "./engine/matchmaking.js";
 
 const KEY = "meow.state.v1";
@@ -42,8 +43,9 @@ export function getState(){ return state; }
 export function subscribe(fn){ listeners.add(fn); return () => listeners.delete(fn); }
 function emit(){ persist(); listeners.forEach(fn => fn(state)); }
 
-// Seed des 100 chats (en mémoire, régénérée à chaque chargement — déterministe).
-export const CATS = generateSeed(100);
+// Seed déterministe : on ne garde QUE les profils qui ont de vraies photos IA
+// générées (présentes dans le manifeste). Les autres (fallback cataas) sont exclus.
+export const CATS = generateSeed(100).filter(c => Array.isArray(GENERATED[c.id]) && GENERATED[c.id].length > 0);
 const CAT_BY_ID = Object.fromEntries(CATS.map(c => [c.id, c]));
 export function catById(id){ return CAT_BY_ID[id]; }
 

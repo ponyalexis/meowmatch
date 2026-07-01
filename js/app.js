@@ -882,8 +882,11 @@ function renderChat(matchId){
     head.querySelector("#autoMini").addEventListener("click", toggleAuto);
     choicesBox.appendChild(head);
     const grid = h(`<div class="choices"></div>`);
+    const DOT = { 1:"•", 2:"••", 3:"•••" }, INT_TITLE = { 1:"Tout en douceur", 2:"Franc", 3:"Audacieux" };
     choices.forEach(c => {
-      const btn = h(`<button class="choice-btn"><span class="c-emoji">${c.emoji}</span><span class="c-lbl">${esc(c.label)}</span><span class="c-chev">›</span></button>`);
+      const lvl = c.int || 2;
+      const dots = `<span class="c-int" title="${INT_TITLE[lvl]}" style="margin-left:auto;font-size:11px;letter-spacing:1px;opacity:.55">${DOT[lvl]}</span>`;
+      const btn = h(`<button class="choice-btn"><span class="c-emoji">${c.emoji}</span><span class="c-lbl">${esc(c.label)}</span>${dots}<span class="c-chev">›</span></button>`);
       btn.addEventListener("click", () => play(c));
       grid.appendChild(btn);
     });
@@ -893,7 +896,18 @@ function renderChat(matchId){
   async function play(choice){
     if(myToken !== viewToken) return;
     choicesBox.querySelectorAll("button").forEach(b => b.disabled = true);
-    const res = Dlg.applyChoice(choice, my, cat, match.dialog);
+    // Si un proxy LLM est configuré, on tente un tour "large spectre" (relance +
+    // choix contextuels + réfs actuelles). Sinon / en cas d'échec : procédural.
+    let llmTurn = null;
+    if(!match.dialog.ended && LLM.llmEnabled()){
+      const history = match.messages.slice(-8).map(m => ({ from: m.fromId === my.id ? "me" : "cat", text: m.text }));
+      history.push({ from: "me", text: choice.line });
+      const think = typing(true);
+      llmTurn = await LLM.generateDialogTurn(my, cat, match.dialog, history, LLM.worldContext());
+      think.remove();
+      if(myToken !== viewToken) return;
+    }
+    const res = Dlg.applyChoice(choice, my, cat, match.dialog, llmTurn);
     // ton chat parle
     const ut = typing(false); await sleep(500); if(myToken!==viewToken) return; ut.remove();
     res.userMsg.ts = Date.now(); match.messages.push(res.userMsg); scroll.appendChild(bubble(res.userMsg)); scroll.scrollTop = scroll.scrollHeight;
@@ -1009,13 +1023,14 @@ function seedDraftFromMy(){
 }
 
 function openLLMConfig(){
-  const cfg = LLM.getLLMConfig() || { endpoint:"", model:"claude-haiku-4-5-20251001" };
+  const cfg = LLM.getLLMConfig() || { endpoint:"", model:"claude-opus-4-8" };
   const bg = h(`<div class="sheet-bg"></div>`);
   const sheet = h(`<div class="sheet"><div class="grip"></div><div class="body">
     <h2 class="name serif">✨ Moteur IA avancé</h2>
-    <p class="mute" style="font-size:14px">Par défaut, les dialogues sont générés localement (aucune connexion requise). Tu peux brancher un vrai modèle via un <b>proxy backend</b> qui détient la clé API — jamais de clé en clair côté navigateur.</p>
-    <div class="field"><label>Endpoint du proxy (POST)</label><input class="input" id="ep" placeholder="https://mon-proxy.exemple/chat" value="${esc(cfg.endpoint||'')}"></div>
-    <div class="field"><label>Modèle</label><input class="input" id="mdl" value="${esc(cfg.model||'')}"></div>
+    <p class="mute" style="font-size:14px">Par défaut, les dialogues (relances ET choix) sont générés localement — aucune connexion requise. Branche un vrai modèle via un <b>proxy backend</b> qui détient la clé API pour un spectre de conversations plus large et des références actuelles (saison, météo…). Jamais de clé en clair côté navigateur.</p>
+    <p class="mute" style="font-size:13px">Proxy local prêt à l'emploi : <code>ANTHROPIC_API_KEY=… npm run proxy</code>, puis endpoint <code>http://localhost:8787/</code>.</p>
+    <div class="field"><label>Endpoint du proxy (POST)</label><input class="input" id="ep" placeholder="http://localhost:8787/" value="${esc(cfg.endpoint||'')}"></div>
+    <div class="field"><label>Modèle</label><input class="input" id="mdl" placeholder="claude-opus-4-8 (ou claude-haiku-4-5 pour la vitesse)" value="${esc(cfg.model||'')}"></div>
     <button class="btn" id="saveLLM">Enregistrer</button>
     <button class="btn ghost" id="clearLLM" style="margin-top:4px">Désactiver (moteur local)</button></div></div>`);
   const close = () => { bg.remove(); sheet.remove(); };
@@ -1032,4 +1047,14 @@ function timeAgo(ts){
   if(s<86400) return Math.floor(s/3600)+" h"; return Math.floor(s/86400)+" j";
 }
 
-if("serviceWorker" in navigator){ window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(()=>{})); }
+if("serviceWorker" in navigator){
+  // Recharge AUTOMATIQUEMENT quand une nouvelle version du SW prend la main :
+  // fini le piège "il faut recharger deux fois" — les mises à jour sont vues direct.
+  let swReloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if(swReloading) return; swReloading = true; location.reload();
+  });
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").then(reg => reg.update && reg.update()).catch(()=>{});
+  });
+}

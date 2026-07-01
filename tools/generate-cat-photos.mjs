@@ -31,7 +31,23 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { generateSeed } from "../js/data/seed.js";
+
+const pexec = promisify(execFile);
+
+// Sauve l'image en JPEG optimisé (resize + compression via sips/macOS ; sinon brut).
+async function saveImage(buf, outAbs){
+  const tmp = outAbs + ".src";
+  await fs.writeFile(tmp, buf);
+  try {
+    await pexec("sips", ["-s","format","jpeg","-s","formatOptions","72","-Z","820", tmp, "--out", outAbs]);
+    await fs.unlink(tmp).catch(()=>{});
+  } catch {
+    await fs.rename(tmp, outAbs);   // pas de sips -> garde le brut
+  }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -133,6 +149,24 @@ async function fetchReference(imageId){
   return Buffer.from(await res.arrayBuffer());
 }
 
+async function withRetry(fn, tries = 5){
+  let last;
+  for(let i=0; i<tries; i++){
+    try { return await fn(); }
+    catch(e){
+      last = e; const m = /\b(\d{3})\b/.exec(e.message); const code = m ? +m[1] : 0;
+      if(code === 429 || code >= 500){
+        const wait = Math.min(45000, 3000 * 2**i);
+        console.log(`    …${code}, nouvelle tentative dans ${Math.round(wait/1000)}s`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw last;
+}
+
 async function processCat(cat, manifest){
   const refBuf = DRY ? null : await fetchReference(cat.imageId);
   const refB64 = refBuf ? refBuf.toString("base64") : null;
@@ -146,8 +180,8 @@ async function processCat(cat, manifest){
     if(DRY){ console.log(`  [${cat.id}#${k}] ${prompt}`); urls.push(outRel); continue; }
     const outAbs = path.join(ROOT, outRel);
     try { await fs.access(outAbs); urls.push(outRel); continue; } catch {}   // resume : skip si déjà généré
-    const jpg = await callImageModel({ model: CFG.model, prompt, negativePrompt: NEGATIVE, initImageB64: refB64, strength: STRENGTH });
-    await fs.writeFile(outAbs, jpg);
+    const jpg = await withRetry(() => callImageModel({ model: CFG.model, prompt, negativePrompt: NEGATIVE, initImageB64: refB64, strength: STRENGTH }));
+    await saveImage(jpg, outAbs);
     urls.push(outRel);
     console.log(`  ✓ ${outRel}`);
   }

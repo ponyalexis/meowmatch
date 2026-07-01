@@ -6,6 +6,7 @@
   "description": "MeowMatch — l'app de rencontre pour chats (PWA statique). package.json présent uniquement pour exécuter les outils Node (tools/).",
   "scripts": {
     "serve": "npx serve .",
+    "proxy": "node tools/llm-proxy.mjs",
     "gen:photos": "node tools/generate-cat-photos.mjs",
     "gen:photos:dry": "node tools/generate-cat-photos.mjs --dry-run --limit 3"
   }
