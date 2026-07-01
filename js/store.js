@@ -70,12 +70,10 @@ export function like(catId){
       id: "m_" + catId,
       catId,
       messages: [],
-      affinity: null,
       createdAt: Date.now(),
       lastTs: Date.now(),
       unread: false,
-      autoplay: true,
-      turnState: null
+      dialog: null   // état du dialogue à choix (affinité, patience, fin…)
     });
     created = true;
   }

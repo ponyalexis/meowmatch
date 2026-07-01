@@ -1,5 +1,6 @@
 import { RNG } from "../rng.js";
 import * as P from "./pools.js";
+import { CAT_IMAGES } from "./cataas-ids.js";
 
 // Point de référence par défaut : centre de Paris (Hôtel de Ville).
 export const PARIS_CENTER = { lat: 48.8566, lng: 2.3522 };
@@ -12,11 +13,9 @@ export function distanceKm(a, b){
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
 }
 
-// Photo "réaliste" : Cat as a Service (cataas.com) renvoie de vraies photos de chats.
-// Le paramètre unique varie l'image ; onerror bascule sur un avatar SVG local (offline safe).
-function photoUrl(seedKey, i){
-  const s = encodeURIComponent(`${seedKey}-${i}`);
-  return `https://cataas.com/cat?width=720&height=900&type=square&unique=${s}`;
+// URL d'une déclinaison photo pour un chat cataas donné (MÊME animal, ambiance différente).
+function photoUrl(catImageId, style){
+  return `https://cataas.com/cat/${catImageId}?width=720&height=900&type=square${style.q}`;
 }
 
 function fill(tpl, ctx){
@@ -26,7 +25,8 @@ function fill(tpl, ctx){
     .replace(/\{breedtag\}/g, ctx.breedtag)
     .replace(/\{trait\}/g, ctx.trait)
     .replace(/\{activity\}/g, ctx.activity)
-    .replace(/\{food\}/g, ctx.food);
+    .replace(/\{food\}/g, ctx.food)
+    .replace(/\{coat\}/g, ctx.coat);
 }
 
 function ageLabel(months){
@@ -35,24 +35,36 @@ function ageLabel(months){
   return m ? `${y} an${y>1?'s':''} et ${m} mois` : `${y} an${y>1?'s':''}`;
 }
 
-// Génère un profil complet, déterministe pour un index donné.
+// Génère un profil complet et COHÉRENT, déterministe pour un index donné.
 export function makeCat(i){
   const rng = new RNG(1000 + i * 7919);          // seed stable par chat
   const name = P.NAMES[i % P.NAMES.length];
-  const breed = rng.pick(P.BREEDS);
+
+  // --- apparence : pilotée par la vraie couleur de la photo cataas épinglée ---
+  const image = CAT_IMAGES[i % CAT_IMAGES.length];
+  const colorKey = P.COLOR_PROFILES[image.color] ? image.color : "divers";
+  const colorProfile = P.COLOR_PROFILES[colorKey];
+  const breed = rng.pick(colorProfile.breeds);   // race cohérente avec la couleur réelle
+
   const gender = rng.pick(P.GENDERS);
   const hood = rng.pick(P.NEIGHBORHOODS);
   const archetype = rng.pick(P.ARCHETYPES);
   const months = rng.int(6, 168);                // 6 mois à 14 ans
-  const traits = rng.sample(P.PERSONALITY_TAGS, rng.int(3,5));
+
+  // --- caractère cohérent avec l'archétype (trait signature imposé) ---
+  const signature = P.ARCHETYPE_TRAIT[archetype.key];
+  const others = rng.sample(P.PERSONALITY_TAGS.filter(t => t !== signature), rng.int(2,3));
+  const traits = [signature, ...others];
+
   const food = rng.pick(P.FOODS);
   const activity = rng.pick(P.ACTIVITIES);
 
   const ctx = {
     hood: hood.name.replace(/\s*\(.*\)/,''),
     age: ageLabel(months),
-    breedtag: breed.tag,
-    trait: traits[0],
+    breedtag: colorProfile.coat,
+    trait: signature,
+    coat: colorProfile.coat,
     activity, food
   };
 
@@ -65,9 +77,8 @@ export function makeCat(i){
   // Petit décalage géographique dans le quartier
   const loc = { lat: hood.lat + (rng.float()-0.5)*0.012, lng: hood.lng + (rng.float()-0.5)*0.012 };
 
-  const seedKey = `${name}-${i}`;
-  const universes = rng.sample(P.UNIVERSES, 5);
-  const photos = universes.map((u, idx) => ({ url: photoUrl(seedKey, idx), caption: u }));
+  // 5 photos = LE MÊME chat, 5 ambiances -> cohérence visuelle garantie.
+  const photos = P.PHOTO_STYLES.map(style => ({ url: photoUrl(image.id, style), caption: style.caption }));
 
   const prompts = rng.sample(P.PROMPTS, 3).map(pr => ({ q: pr.q, a: rng.pick(pr.a) }));
 
@@ -81,7 +92,7 @@ export function makeCat(i){
   ({
     potdecolle:()=>bump('affection',30),
     aventurier:()=>bump('curiosity',30),
-    diva:()=>bump('independence',25),
+    diva:()=>{bump('independence',25);},
     chasseur:()=>{bump('playfulness',20);bump('curiosity',20);},
     philosophe:()=>bump('laziness',35),
     clown:()=>bump('playfulness',30),
@@ -93,12 +104,21 @@ export function makeCat(i){
     zen:()=>bump('laziness',25)
   })[archetype.key]?.();
 
+  // "Dur de la feuille" : exigence/susceptibilité, pour le dialogue à choix.
+  // Diva / timide / zen / philosophe sont plus difficiles à séduire.
+  const hardArch = { diva:35, timide:28, zen:22, philosophe:20 }[archetype.key] || 0;
+  const pickiness = Math.min(95, Math.round(stats.independence*0.5 + (100-stats.affection)*0.3 + hardArch + rng.int(0,15)));
+
   return {
     id: `cat_${i}`,
     name,
-    seedKey,
-    breed: breed.name,
-    breedTag: breed.tag,
+    seedKey: `${name}-${i}`,
+    imageId: image.id,
+    color: colorKey,
+    colorEmoji: colorProfile.emoji,
+    coat: colorProfile.coat,
+    breed,
+    breedTag: colorProfile.coat,
     gender: gender.key,
     genderLabel: gender.label,
     genderEmoji: gender.emoji,
@@ -112,6 +132,7 @@ export function makeCat(i){
     archetype,
     personality: traits,
     stats,
+    pickiness,                                    // 0-95 : plus c'est haut, plus il·elle est exigeant·e
     lookingFor: rng.pick(P.LOOKING_FOR),
     dealbreaker: rng.pick(P.DEALBREAKERS),
     favorites: {
@@ -123,7 +144,6 @@ export function makeCat(i){
     zodiac: rng.pick(P.ZODIAC),
     prompts,
     ownerNote: rng.pick(P.OWNER_NOTES),
-    // ~65% de "vrais" chats (comptes de vrais foyers), ~35% de bots assumés.
     isBot: rng.bool(0.35),
     vaccinated: rng.bool(0.92),
     verified: rng.bool(0.6)
@@ -137,11 +157,14 @@ export function generateSeed(n = 100){
   return cats;
 }
 
-// Avatar SVG de secours (offline) — mignon, dérivé du nom.
+// Avatar SVG de secours (offline), teinté selon la couleur réelle du chat.
 export function fallbackAvatar(cat){
   const rng = new RNG(cat.seedKey || cat.name);
-  const furs = ["#D9A066","#8C7B6B","#4A4A4A","#E8E1D6","#C97B4A","#6B6B6B","#F0C987","#3A3A3A"];
-  const fur = furs[Math.floor(rng.float()*furs.length)];
+  const FUR = {
+    noir:"#2E2E2E", roux:"#D98A3D", blanc:"#F1EAE0", gris:"#8A93A0",
+    "tigré":"#B07A47", calico:"#C98A5A", "crème":"#E7CBA0", bicolore:"#3A3A3A", divers:"#B79A78"
+  };
+  const fur = FUR[cat.color] || "#B79A78";
   const eye = ["#7BC47F","#F0C05A","#7BA3D9"][Math.floor(rng.float()*3)];
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='375' viewBox='0 0 300 375'>
     <rect width='300' height='375' fill='#FBF7F0'/>

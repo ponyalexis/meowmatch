@@ -121,6 +121,36 @@ export const ACTIVITIES = ["observer les pigeons","faire tomber des objets","cha
 
 export const ZODIAC = ["♈ Bélier","♉ Taureau","♊ Gémeaux","♋ Cancer","♌ Lion","♍ Vierge","♎ Balance","♏ Scorpion","♐ Sagittaire","♑ Capricorne","♒ Verseau","♓ Poissons"];
 
+// Cohérence apparence : la couleur réelle de la photo (tag cataas) pilote la race,
+// le descriptif de pelage et l'emoji. Le profil est ainsi cohérent de bout en bout.
+export const COLOR_PROFILES = {
+  noir:     { emoji:"🖤", coat:"au pelage noir de jais",        breeds:["Bombay","Chat noir de gouttière","Européen noir"] },
+  roux:     { emoji:"🧡", coat:"roux flamboyant",               breeds:["Roux tigré","Maine Coon roux","Européen roux"] },
+  blanc:    { emoji:"🤍", coat:"tout·e blanc·he immaculé·e",     breeds:["Angora turc","Persan blanc","Européen blanc"] },
+  gris:     { emoji:"🩶", coat:"au pelage gris-bleu",           breeds:["Chartreux","British Shorthair","Bleu russe"] },
+  "tigré":  { emoji:"🐯", coat:"au pelage tigré",               breeds:["Européen tigré","Bengal","Tabby classique"] },
+  calico:   { emoji:"🎨", coat:"tricolore (robe calico)",       breeds:["Écaille de tortue","Calico","Européenne tricolore"] },
+  "crème":  { emoji:"🤎", coat:"crème et caramel",              breeds:["Ragdoll","Sacré de Birmanie","Chat crème"] },
+  bicolore: { emoji:"🐾", coat:"en smoking noir & blanc",        breeds:["Tuxedo (noir & blanc)","Européen bicolore"] },
+  divers:   { emoji:"🐾", coat:"au charme unique",              breeds:["Européen (chat de gouttière)","Chat des toits parisiens"] }
+};
+
+// Déclinaisons photo à partir d'UN SEUL chat : même animal, ambiances différentes.
+export const PHOTO_STYLES = [
+  { q:"&position=center",                            caption:"Au naturel" },
+  { q:"&position=top&brightness=1.08&saturation=1.12", caption:"Golden hour ✨" },
+  { q:"&position=bottom&saturation=1.18",            caption:"Séance canapé" },
+  { q:"&filter=mono",                                caption:"Portrait de star 🖤" },
+  { q:"&position=right&brightness=1.05&saturation=1.2", caption:"Rêveur·se à la fenêtre" }
+];
+
+// Trait signature imposé par l'archétype (garantit la cohérence de caractère).
+export const ARCHETYPE_TRAIT = {
+  potdecolle:"pot de colle", aventurier:"aventurier·e", diva:"diva", chasseur:"chasseur·se",
+  philosophe:"dodo pro", clown:"malicieux·se", gourmand:"gourmand·e", athlete:"joueur·se",
+  timide:"froussard·e", seducteur:"affectueux·se", bavard:"bavard·e", zen:"peace & love"
+};
+
 // Univers photo — le "5 photos dans divers univers"
 export const UNIVERSES = [
   "Golden hour sur le rebord ✨","Nap time","Chasseur·se du salon","Aventure sur le balcon",
