@@ -1,6 +1,6 @@
 /* Service worker minimal — cache l'app shell pour un fonctionnement PWA/offline.
    Les photos cataas.com restent chargées depuis le réseau (avec fallback SVG). */
-const CACHE = "meowmatch-v5";
+const CACHE = "meowmatch-v6";
 const SHELL = [
   "./",
   "./index.html",

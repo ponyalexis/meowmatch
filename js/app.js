@@ -53,15 +53,16 @@ function compressImage(file, max=760){
 
 /* ---------- router ---------- */
 function go(route){ location.hash = "#/" + route; }
-function currentRoute(){ return location.hash.replace(/^#\//, "") || (Store.getState().onboarded ? "discover" : "onboard"); }
+function currentRoute(){ return location.hash.replace(/^#\//, "") || (Store.getState().onboarded ? "discover" : "landing"); }
 window.addEventListener("hashchange", render);
 window.addEventListener("DOMContentLoaded", render);
 
 function setActiveTab(route){
   const base = route.split("/")[0];
   app.classList.toggle("chat-mode", base === "chat");
-  const show = ["discover","matches","profile"].includes(base);   // plein écran sur le chat
+  const show = ["discover","matches","profile"].includes(base);   // plein écran sur le chat/landing
   tabbar.hidden = !show || !Store.getState().onboarded;
+  app.classList.toggle("no-tabbar", tabbar.hidden && base !== "chat");
   [...tabbar.querySelectorAll(".tab")].forEach(t => {
     const r = t.dataset.route;
     t.classList.toggle("on", r === base || (base==="chat" && r==="matches"));
@@ -77,10 +78,12 @@ function render(){
   viewToken++;
   const route = currentRoute();
   const st = Store.getState();
-  if(!st.onboarded && route !== "onboard"){ go("onboard"); return; }
+  const rbase = route.split("/")[0];
+  if(!st.onboarded && !["landing","onboard"].includes(rbase)){ go("landing"); return; }
   if(st.onboarded && Store.ensureDaily()) pendingDaily = true;   // nouveau jour -> cadeau à réclamer
   app.innerHTML = ""; setActiveTab(route); window.scrollTo(0,0);
   const base = route.split("/")[0];
+  if(base === "landing") return renderLanding();
   if(base === "onboard") return renderHero();
   if(base === "discover") return renderDiscover();
   if(base === "matches") return renderMatches();
@@ -100,6 +103,96 @@ const draft = {
   bio:""
 };
 const AVATARS = ["🐱","🐈","🐈‍⬛","😺","😸","😻","🙀","😹","😽","🐯","🦁","🐾"];
+
+/* ============================================================
+   LANDING PAGE (marketing) — mobile-first
+   ============================================================ */
+function startJourney(){
+  if(Store.getState().onboarded) go("discover");
+  else wizard(0);
+}
+function resetAllConfirm(){
+  if(confirm("Tout effacer et repartir de zéro ? (profil, matchs, conversations, série)")){
+    Store.resetAll(); location.hash = "#/landing"; render(); toast("Données effacées 🧹");
+  }
+}
+
+function renderLanding(){
+  const st = Store.getState();
+  const myName = st.myCat?.name || "Minou";
+  const hero = Store.CATS.find(c => c.color === "blanc") || Store.CATS[0];
+
+  const el = h(`<div class="lp">
+    <header class="lp-header">
+      <div class="lp-logo">🐾 <span>MeowMatch</span></div>
+      <button class="lp-join" id="lpJoin">Rejoindre l'aventure</button>
+    </header>
+    <nav class="lp-nav">
+      <a data-act="concept">Concept</a>
+      <a data-act="stories">Histoires</a>
+      <a data-act="download">Télécharger</a>
+    </nav>
+
+    <section class="lp-hero">
+      <div class="lp-kicker">Le premier dating-sim pour félins</div>
+      <h1 class="lp-h1">La romance féline, réinventée par l'IA.</h1>
+      <p class="lp-lead">Une expérience éditoriale où la complicité de votre chat guide chaque rencontre. Débloquez des chapitres de vie passionnants et trouvez l'accord parfait, dans une atmosphère de luxe et de sérénité.</p>
+      <div class="lp-cta-row">
+        <button class="btn" id="lpPrimary">Trouver l'âme sœur de ${esc(myName)} →</button>
+        <button class="btn secondary" id="lpConcept">Voir le concept</button>
+      </div>
+      <div class="lp-photo">
+        <div class="lp-photo-cap"><b>Minette, 3 ans</b><span>Amatrice de siestes au soleil & caviar au thon</span></div>
+      </div>
+    </section>
+
+    <section class="lp-section" id="lp-concept">
+      <h2 class="lp-h2">Plus qu'un swipe, une histoire.</h2>
+      <p class="lp-sub">Chaque rencontre est un nouveau chapitre narratif généré par notre IA pour refléter la personnalité unique de votre compagnon.</p>
+      <div class="lp-features">
+        <div class="lp-feat"><div class="lp-feat-ico">📖</div><h3>Histoires interactives</h3><p>Vivez des dialogues à choix multiples où les préférences de votre chat influencent le cours du récit.</p></div>
+        <div class="lp-feat"><div class="lp-feat-ico">💗</div><h3>Barre de complicité</h3><p>Suivez l'évolution du lien en temps réel. Plus vous jouez, plus les récompenses exclusives se débloquent.</p></div>
+        <div class="lp-feat"><div class="lp-feat-ico">🐾</div><h3>Profils psychologiques</h3><p>Une IA analyse les habitudes de votre chat pour lui proposer des partenaires qui partagent ses passions.</p></div>
+      </div>
+    </section>
+
+    <section class="lp-testi">
+      <div class="lp-quote">
+        <span class="lp-qmark">”</span>
+        <p>MeowMatch a transformé ma vision des apps pour animaux. C'est chic, intelligent, et ${esc(myName)} adore voir les nouveaux messages arriver.</p>
+        <div class="lp-author"><div class="lp-ava">🐱</div><div><b>Sophie L., Paris</b><small>Maman de Caramel</small></div></div>
+      </div>
+    </section>
+
+    <section class="lp-final">
+      <h2 class="lp-h2">Prêt·e à écrire votre histoire&nbsp;?</h2>
+      <button class="btn" id="lpPrimary2">Créer le profil de mon chat 🐾</button>
+      <div class="lp-foot">
+        <span>MeowMatch · démo · faite avec 🐾 à Paris</span>
+        <button class="lp-reset" id="lpReset">Tout effacer</button>
+      </div>
+    </section>
+  </div>`);
+
+  // photo héro (vrai chat, fallback SVG)
+  const photo = el.querySelector(".lp-photo");
+  const img = imgWithFallback(hero, hero.photos[0].url, "lp-photo-img");
+  photo.prepend(img);
+
+  const concept = () => el.querySelector("#lp-concept").scrollIntoView({ behavior:"smooth", block:"start" });
+  el.querySelector("#lpJoin").addEventListener("click", startJourney);
+  el.querySelector("#lpPrimary").addEventListener("click", startJourney);
+  el.querySelector("#lpPrimary2").addEventListener("click", startJourney);
+  el.querySelector("#lpConcept").addEventListener("click", concept);
+  el.querySelector("#lpReset").addEventListener("click", resetAllConfirm);
+  el.querySelectorAll(".lp-nav a").forEach(a => a.addEventListener("click", () => {
+    const act = a.dataset.act;
+    if(act === "concept") concept();
+    else if(act === "stories") startJourney();
+    else toast("Menu du navigateur → « Ajouter à l'écran d'accueil » 📲");
+  }));
+  app.appendChild(el);
+}
 
 function renderHero(){
   const emojis = ["🐈","🐾","💛","😻","🐱","✨","🐈‍⬛","🎾"];
@@ -905,7 +998,7 @@ function renderProfile(){
   wrap.querySelector("#mBio").addEventListener("click", () => openProfileSheet(publicSelf(), null));
   wrap.querySelector("#mLLM").addEventListener("click", openLLMConfig);
   wrap.querySelector("#mInstall").addEventListener("click", () => toast("Menu du navigateur → « Ajouter à l'écran d'accueil » 📲"));
-  wrap.querySelector("#mReset").addEventListener("click", () => { if(confirm("Tout effacer et repartir de zéro ?")){ Store.resetAll(); location.hash="#/onboard"; render(); } });
+  wrap.querySelector("#mReset").addEventListener("click", resetAllConfirm);
 }
 function publicSelf(){ const my = Store.getState().myCat; return { ...my, photos: my.photos?.length?my.photos:[{ url:fallbackAvatar(my), caption:"Mon chat" }], prompts: my.prompts||[] }; }
 function seedDraftFromMy(){
