@@ -1,0 +1,6 @@
+name = "meowmatch-llm"
+main = "index.js"
+compatibility_date = "2026-01-01"
+
+# La clé API n'est PAS ici (jamais en clair). On la pose en secret :
+#   npx wrangler secret put ANTHROPIC_API_KEY
